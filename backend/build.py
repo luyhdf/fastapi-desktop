@@ -10,7 +10,7 @@ params = [
     '--clean',
     # 无需用户确认
     '--noconfirm',
-    'client.py'
+    'app.py'
 ]
 # pyinstaller -F main.py
 pyi.run(params)

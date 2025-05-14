@@ -3,7 +3,7 @@ import socket
 import threading
 
 import webview
-from main import app
+from web import app
 import uvicorn
 
 

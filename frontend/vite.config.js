@@ -6,6 +6,6 @@ export default defineConfig({
   base: '/static',
   plugins: [vue()],
   build: {
-    outDir: '../static'
+    outDir: '../backend/static'
   }
 })

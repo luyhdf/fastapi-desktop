@@ -1,3 +1,5 @@
+i2cpy
+littlefs-python
 pywebview
 fastapi
 uvicorn
