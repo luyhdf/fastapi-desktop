@@ -7,6 +7,17 @@ from eeprom import I2CEEPROMFileSystem
 
 app = FastAPI()
 
+from fastapi.middleware.cors import CORSMiddleware
+
+# 添加 CORS 中间件
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Vite 开发服务器默认端口
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 static_file_abspath = os.path.join(os.path.dirname(__file__), "static")
 
 app.mount("/static", StaticFiles(directory=static_file_abspath), name="static")

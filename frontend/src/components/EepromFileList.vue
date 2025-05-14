@@ -32,6 +32,11 @@ const files = ref([])
 const loading = ref(true)
 const error = ref(null)
 
+// API 基础 URL 配置
+const API_BASE_URL = import.meta.env.DEV 
+  ? 'http://localhost:8000'  // 开发环境
+  : ''  // 生产环境
+
 const formatSize = (size) => {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
@@ -42,7 +47,7 @@ const fetchFiles = async () => {
   try {
     loading.value = true
     error.value = null
-    const response = await fetch('/eeprom')
+    const response = await fetch(`${API_BASE_URL}/eeprom`)
     const data = await response.json()
     files.value = data.files
   } catch (e) {
