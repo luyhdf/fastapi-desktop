@@ -1,0 +1,4 @@
+pywebview
+fastapi
+uvicorn
+pyinstaller

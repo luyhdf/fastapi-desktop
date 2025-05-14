@@ -27,3 +27,5 @@ venv
 build
 __pycache__
 .idea/
+.venv
+static/
