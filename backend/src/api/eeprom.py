@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException
 from driver import I2CEEPROMFileSystem
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from typing import List, Optional
+import time
 
 router = APIRouter()
 
@@ -10,6 +12,18 @@ class FileContent(BaseModel):
 
 class RenameRequest(BaseModel):
     new_name: str
+
+class BatchDeleteRequest(BaseModel):
+    filenames: List[str]
+
+class SearchRequest(BaseModel):
+    keyword: str
+    case_sensitive: bool = False
+
+class SystemInfo(BaseModel):
+    """系统信息模型"""
+    version: str = "1.0.0"
+    last_update: str = time.strftime("%Y-%m-%d %H:%M:%S")
 
 @router.get("/status")
 def get_status():
@@ -224,5 +238,128 @@ def get_storage_info():
                 }
             }
         })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/batch/delete")
+def batch_delete(request: BatchDeleteRequest):
+    """批量删除文件"""
+    try:
+        fs = I2CEEPROMFileSystem()
+        if not fs.get_status()["i2c_connected"]:
+            raise HTTPException(status_code=503, detail="EEPROM未连接")
+            
+        results = []
+        for filename in request.filenames:
+            try:
+                fs.remove(filename)
+                results.append({
+                    "filename": filename,
+                    "success": True,
+                    "message": "删除成功"
+                })
+            except Exception as e:
+                results.append({
+                    "filename": filename,
+                    "success": False,
+                    "message": str(e)
+                })
+                
+        return JSONResponse(content={
+            "success": True,
+            "results": results
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/search")
+def search_files(request: SearchRequest):
+    """搜索文件内容"""
+    try:
+        fs = I2CEEPROMFileSystem()
+        if not fs.get_status()["i2c_connected"]:
+            raise HTTPException(status_code=503, detail="EEPROM未连接")
+            
+        results = []
+        for filename in fs.listdir():
+            try:
+                content = fs.read_file(filename)
+                if not request.case_sensitive:
+                    content = content.lower()
+                    keyword = request.keyword.lower()
+                else:
+                    keyword = request.keyword
+                    
+                if keyword in content:
+                    results.append({
+                        "filename": filename,
+                        "matches": content.count(keyword)
+                    })
+            except:
+                continue
+                
+        return JSONResponse(content={
+            "success": True,
+            "keyword": request.keyword,
+            "case_sensitive": request.case_sensitive,
+            "results": results
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/file/info/{filename}")
+def get_file_info(filename: str):
+    """获取文件详细信息"""
+    try:
+        fs = I2CEEPROMFileSystem()
+        if not fs.get_status()["i2c_connected"]:
+            raise HTTPException(status_code=503, detail="EEPROM未连接")
+            
+        try:
+            content = fs.read_file(filename)
+            return JSONResponse(content={
+                "success": True,
+                "file": {
+                    "name": filename,
+                    "size": len(content),
+                    "lines": len(content.splitlines()),
+                    "last_modified": time.strftime("%Y-%m-%d %H:%M:%S")
+                }
+            })
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail=f"文件 {filename} 不存在")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/file/copy/{filename}")
+def copy_file(filename: str, new_name: str):
+    """复制文件"""
+    try:
+        fs = I2CEEPROMFileSystem()
+        if not fs.get_status()["i2c_connected"]:
+            raise HTTPException(status_code=503, detail="EEPROM未连接")
+            
+        # 检查源文件是否存在
+        try:
+            content = fs.read_file(filename)
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail=f"源文件 {filename} 不存在")
+            
+        # 检查目标文件是否已存在
+        try:
+            fs.read_file(new_name)
+            raise HTTPException(status_code=400, detail=f"目标文件 {new_name} 已存在")
+        except FileNotFoundError:
+            pass
+            
+        # 写入新文件
+        fs.write_file(new_name, content)
+        
+        return JSONResponse(content={
+            "success": True,
+            "message": f"文件 {filename} 复制为 {new_name} 成功"
+        })
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
