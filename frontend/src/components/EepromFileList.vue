@@ -3,15 +3,14 @@
     <div class="header">
       <h2>EEPROM 文件系统</h2>
       <div class="status-bar">
-        <div class="status-item" :class="{ 'connected': status.i2c_connected }">
-          I2C: {{ status.i2c_connected ? '已连接' : '未连接' }}
-        </div>
-        <div class="status-item" :class="{ 'mounted': status.is_mounted }">
-          文件系统: {{ status.is_mounted ? '已挂载' : '未挂载' }}
+        <div class="status-item" :class="getStatusClass()">
+          {{ getStatusText() }}
         </div>
         <div class="storage-info">
-          存储: {{ formatSize(storage.used) }} / {{ formatSize(storage.total) }}
-          ({{ Math.round(storage.used / storage.total * 100) }}%)
+          <div class="storage-item">
+            存储: {{ storage.formatted?.used || '0 B' }} / {{ storage.formatted?.total || '0 B' }}
+            ({{ storage.formatted?.usage || '0%' }})
+          </div>
         </div>
       </div>
       <div class="actions">
@@ -41,7 +40,6 @@
           <div class="file-header">
             <div class="file-info">
               <span class="file-name">{{ file.name }}</span>
-              <span class="file-size">{{ formatSize(file.size) }}</span>
             </div>
             <div class="file-actions">
               <button @click="viewFile(file)" class="action-btn small">
@@ -54,9 +52,6 @@
           </div>
           <div v-if="file.error" class="file-error">
             错误: {{ file.error }}
-          </div>
-          <div v-if="file.showContent" class="file-content">
-            <pre>{{ file.content }}</pre>
           </div>
         </div>
       </div>
@@ -181,12 +176,15 @@ const fetchFiles = async () => {
   try {
     loading.value = true
     error.value = null
-    const response = await fetch(`${API_BASE_URL}/eeprom`)
+    const response = await fetch(`${API_BASE_URL}/eeprom/list`)
     const data = await response.json()
-    files.value = data.files.map(file => ({
-      ...file,
-      showContent: false
-    }))
+    if (data.success) {
+      files.value = data.files.map(filename => ({
+        name: filename
+      }))
+    } else {
+      error.value = '获取文件列表失败'
+    }
   } catch (e) {
     error.value = '获取文件列表失败: ' + e.message
   } finally {
@@ -265,9 +263,26 @@ const deleteFile = async (filename) => {
   }
 }
 
-const viewFile = (file) => {
-  selectedFile.value = file
-  showFileDialog.value = true
+const viewFile = async (file) => {
+  try {
+    loading.value = true
+    const response = await fetch(`${API_BASE_URL}/eeprom/read/${file.name}`)
+    const data = await response.json()
+    if (data.success) {
+      selectedFile.value = {
+        name: file.name,
+        content: data.content,
+        size: data.content.length
+      }
+      showFileDialog.value = true
+    } else {
+      error.value = '读取文件失败'
+    }
+  } catch (e) {
+    error.value = '读取文件失败: ' + e.message
+  } finally {
+    loading.value = false
+  }
 }
 
 const closeFileDialog = () => {
@@ -349,6 +364,18 @@ const saveFile = async () => {
   }
 }
 
+const getStatusClass = () => {
+  if (!status.value.i2c_connected) return 'disconnected'
+  if (!status.value.is_mounted) return 'unmounted'
+  return 'connected'
+}
+
+const getStatusText = () => {
+  if (!status.value.i2c_connected) return '未连接'
+  if (!status.value.is_mounted) return '格式化失败'
+  return '已连接'
+}
+
 onMounted(refresh)
 </script>
 
@@ -381,12 +408,21 @@ onMounted(refresh)
   background: #00C851;
 }
 
-.status-item.mounted {
-  background: #00C851;
+.status-item.disconnected {
+  background: #ff4444;
+}
+
+.status-item.unmounted {
+  background: #ff9800;
 }
 
 .storage-info {
   margin-left: auto;
+  display: flex;
+  gap: 10px;
+}
+
+.storage-item {
   padding: 5px 10px;
   background: #2196F3;
   color: white;
@@ -478,16 +514,11 @@ onMounted(refresh)
 
 .file-info {
   display: flex;
-  gap: 10px;
   align-items: center;
 }
 
 .file-name {
   font-weight: bold;
-}
-
-.file-size {
-  color: #666;
 }
 
 .file-actions {

@@ -20,11 +20,6 @@ class SearchRequest(BaseModel):
     keyword: str
     case_sensitive: bool = False
 
-class SystemInfo(BaseModel):
-    """系统信息模型"""
-    version: str = "1.0.0"
-    last_update: str = time.strftime("%Y-%m-%d %H:%M:%S")
-
 @router.get("/status")
 def get_status():
     """获取EEPROM状态"""
@@ -64,36 +59,6 @@ def format_eeprom():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/")
-def eeprom():
-    """获取所有文件信息"""
-    try:
-        fs = I2CEEPROMFileSystem()
-        if not fs.get_status()["i2c_connected"]:
-            raise HTTPException(status_code=503, detail="EEPROM未连接")
-            
-        files = []
-        for filename in fs.listdir():
-            try:
-                with fs.open(filename, 'r') as f:
-                    content = f.read()
-                    files.append({
-                        "name": filename,
-                        "size": len(content),
-                        "content": content
-                    })
-            except Exception as e:
-                files.append({
-                    "name": filename,
-                    "error": str(e)
-                })
-        return JSONResponse(content={
-            "success": True,
-            "files": files
-        })
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.get("/list")
 def eeprom_list():
     """获取文件列表"""
@@ -102,12 +67,9 @@ def eeprom_list():
         if not fs.get_status()["i2c_connected"]:
             raise HTTPException(status_code=503, detail="EEPROM未连接")
             
-        files = []
-        for filename in fs.listdir():
-            files.append(filename)
         return JSONResponse(content={
             "success": True,
-            "files": files
+            "files": fs.listdir()
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -223,6 +185,9 @@ def get_storage_info():
                 size /= 1024
             return f"{size:.2f} MB"
             
+        # 计算使用率
+        used_percent = round(info["used"] / info["total"] * 100, 2) if info["total"] > 0 else 0
+            
         return JSONResponse(content={
             "success": True,
             "storage": {
@@ -231,10 +196,13 @@ def get_storage_info():
                 "free": info["free"],
                 "block_size": info["block_size"],
                 "block_count": info["block_count"],
+                "used_blocks": info["used_blocks"],
                 "formatted": {
                     "total": format_size(info["total"]),
                     "used": format_size(info["used"]),
-                    "free": format_size(info["free"])
+                    "free": format_size(info["free"]),
+                    "block_size": format_size(info["block_size"]),
+                    "usage": f"{used_percent}%"
                 }
             }
         })

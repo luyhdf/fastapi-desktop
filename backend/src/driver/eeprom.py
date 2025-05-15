@@ -39,7 +39,7 @@ class EEPROMContext(UserContext):
 class I2CEEPROMFileSystem(LittleFS):
     """I2C EEPROM文件系统，使用LittleFS格式"""
     
-    def __init__(self, i2c: I2C = None, eeprom_addr: int = 0x50, block_size=512, block_count=64):
+    def __init__(self,  eeprom_addr: int = 0x50, block_size=512, block_count=64):
         """
         初始化I2C EEPROM文件系统
         :param i2c: I2C实例，如果为None则自动创建
@@ -47,19 +47,13 @@ class I2CEEPROMFileSystem(LittleFS):
         :param block_size: 块大小
         :param block_count: 块数量
         """
-        self.i2c = i2c
         self.eeprom_addr = eeprom_addr
-        self.i2c_connected = False
-        self.is_mounted = False
         self._block_size = block_size
         self._block_count = block_count
         
-        # 如果没有提供i2c实例，则创建一个
-        if i2c is None:
-            self._connect_i2c()
-        else:
-            self.i2c_connected = True
-            
+        self.i2c_connected = False
+        self.is_mounted = False
+        self._connect_i2c()
         if self.i2c_connected:
             self._initialize_filesystem(block_size, block_count)
 
@@ -153,22 +147,14 @@ class I2CEEPROMFileSystem(LittleFS):
                 "used": 0,
                 "free": 0,
                 "block_size": self._block_size,
-                "block_count": self._block_count
+                "block_count": self.block_count,
+                "used_blocks": self.used_block_count
             }
             
         try:
-            total = self._block_size * self._block_count
-            used = 0
-            
-            # 计算所有文件的大小
-            for filename in self.listdir():
-                try:
-                    with self.open(filename, 'r') as f:
-                        content = f.read()
-                        used += len(content)
-                except:
-                    continue
-                    
+            # 使用LittleFS底层属性获取存储信息
+            total = self.block_count * self._block_size 
+            used = self.used_block_count * self._block_size
             free = total - used
             
             return {
@@ -176,7 +162,8 @@ class I2CEEPROMFileSystem(LittleFS):
                 "used": used,
                 "free": free,
                 "block_size": self._block_size,
-                "block_count": self._block_count
+                "block_count": self.block_count,
+                "used_blocks": self.used_block_count
             }
         except Exception as e:
             print(f"获取存储信息失败: {str(e)}")
@@ -185,7 +172,7 @@ class I2CEEPROMFileSystem(LittleFS):
                 "used": 0,
                 "free": 0,
                 "block_size": self._block_size,
-                "block_count": self._block_count
+                "block_count": self.block_count
             }
 
 # 使用示例
