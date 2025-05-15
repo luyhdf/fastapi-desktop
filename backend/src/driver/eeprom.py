@@ -1,10 +1,10 @@
 from littlefs import LittleFS, UserContext
-from i2cpy import I2C
+from i2cpy import I2C, errors
 import time
 
 class EEPROMBuffer:
     """直接映射EEPROM数据的缓冲区"""
-    def __init__(self, i2c: I2C, eeprom_addr: int = 0x50,addrsize=16):
+    def __init__(self, i2c: I2C, eeprom_addr: int = 0x50, addrsize=16):
         self.i2c = i2c
         self.eeprom_addr = eeprom_addr
         self.addrsize = addrsize
@@ -15,19 +15,19 @@ class EEPROMBuffer:
         end = addr.stop 
         size = end - start
         if size > 0:
-            return self.i2c.readfrom_mem(self.eeprom_addr, start, size,addrsize=self.addrsize)
+            return self.i2c.readfrom_mem(self.eeprom_addr, start, size, addrsize=self.addrsize)
         return b''
         
     def __setitem__(self, addr: slice, value: list | bytes):
         start = addr.start 
         page_size = 64
         if isinstance(value, list):
-            for i in range(0,len(value),page_size):
-                self.i2c.writeto_mem(self.eeprom_addr, start+i, bytes(value[i:i+page_size]),addrsize=self.addrsize)
+            for i in range(0, len(value), page_size):
+                self.i2c.writeto_mem(self.eeprom_addr, start+i, bytes(value[i:i+page_size]), addrsize=self.addrsize)
                 time.sleep(0.005)  # 等待写入完成
         elif isinstance(value, bytes):
-            for i in range(0,len(value),page_size):
-                self.i2c.writeto_mem(self.eeprom_addr, start+i, value[i:i+page_size],addrsize=self.addrsize)
+            for i in range(0, len(value), page_size):
+                self.i2c.writeto_mem(self.eeprom_addr, start+i, value[i:i+page_size], addrsize=self.addrsize)
                 time.sleep(0.005)  # 等待写入完成
 
 
@@ -55,8 +55,24 @@ class I2CEEPROMFileSystem(LittleFS):
         context = EEPROMContext(i2c, eeprom_addr)
         
         # 初始化LittleFS，传入EEPROM上下文
-        super().__init__(context=context, block_size=block_size, block_count=block_count)
-    
+        super().__init__(context=context, block_size=block_size, block_count=block_count, mount=False)
+        self.is_mounted = False 
+        try:
+            self.mount()
+            self.is_mounted = True
+        except errors.LittleFSError:
+            print("加载EEPROM失败")
+
+    def format(self):
+        """
+        格式化EEPROM
+        """
+        try:
+            super().format()
+            self.mount()
+        except errors.LittleFSError:
+            print("格式化EEPROM失败")
+
     def write_file(self, filename: str, content: str):
         """
         写入文件
@@ -80,12 +96,8 @@ if __name__ == "__main__":
     # 创建文件系统实例
     fs = I2CEEPROMFileSystem()  # 使用默认I2C配置
     
-    # # 写入文件
+    # 写入文件
     fs.write_file('test1.txt', 'Hello, LittleFS on EEPROM!')
-    
-    # # 读取文件
-    # content = fs.read_file('test.txt')
-    # print(f"File content: {content}")
     
     # 列出目录内容
     print("Directory contents:")

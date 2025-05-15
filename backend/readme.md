@@ -8,9 +8,9 @@ conda activate fastapi-desktop
 pip install -r requirements.txt
 
 # 运行web
-python web.py
+python src/web.py
 # 运行app
-python app.py
+python src/app.py
 
 # 打包app
 python build.py

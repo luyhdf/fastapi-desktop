@@ -26,7 +26,7 @@ params = [
     # 添加必要的隐藏导入
     # '--hidden-import', 'i2cpy',
     # 主程序
-    'app.py'
+    'src/app.py'
 ]
 
 # 运行 PyInstaller
