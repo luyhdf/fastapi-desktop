@@ -16,11 +16,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-static_file_abspath = os.path.join(os.path.dirname(__file__), "..\static")
-print(static_file_abspath)
-app.mount("/static", StaticFiles(directory=static_file_abspath), name="static")
-
 app.include_router(eeprom_router, prefix="/eeprom")
+
+static_file_abspath = os.path.join(os.path.dirname(__file__), "..\static")
+app.mount("/static", StaticFiles(directory=static_file_abspath), name="static")
 
 @app.get("/")
 def index():

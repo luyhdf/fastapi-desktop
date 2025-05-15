@@ -107,7 +107,7 @@ onMounted(fetchFiles)
 }
 
 .file-content {
-  background: #f5f5f5;
+  background: #4a494c;
   padding: 10px;
   border-radius: 4px;
   overflow-x: auto;
